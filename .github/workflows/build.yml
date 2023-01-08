@@ -36,7 +36,7 @@ jobs:
           BUILD_SUFFIX: ${{ env.MOLD_STABLE_VERSION }}
           LOG_OUTPUT: build-mold-stable.log
         run: ./build-mold.sh
-      - name: Commit and push build
+      - name: Commit and push builds
         run: |
           cd out
           git init
@@ -45,5 +45,5 @@ jobs:
           git remote add origin "https://${{ secrets.GH_USERNAME }}:${{ secrets.GH_TOKEN }}@github.com/${{ github.repository }}"
           git checkout --orphan build
           git add .
-          git commit --message="mold nightly build"
+          git commit --message="mold nightly builds"
           git push --force origin build

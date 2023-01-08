@@ -1,4 +1,4 @@
-# mold nightly build
+# mold nightly builds
 
 This repository holds nightly build of the
 [mold linker](https://github.com/rui314/mold) for x86_64 Linux. The latest
