@@ -5,8 +5,8 @@ set -e
 OUTDIR="${OUTDIR:-"$PWD/out"}"
 mkdir -p "$OUTDIR"
 
-LOG_OUTPUT="${LOG_OUTPUT:-$OUTDIR/build-mold.log}"
-exec > >(tee "$LOG_OUTPUT")
+LOG_OUTPUT="${LOG_OUTPUT:-"build-mold.log"}"
+exec > >(tee "$OUTDIR/$LOG_OUTPUT")
 exec 2>&1
 
 GIT_REF="${GIT_REF:-"main"}"

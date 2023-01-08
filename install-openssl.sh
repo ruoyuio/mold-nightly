@@ -5,8 +5,8 @@ set -e
 OUTDIR="${OUTDIR:-"$PWD/out"}"
 mkdir -p "$OUTDIR"
 
-LOG_OUTPUT="${LOG_OUTPUT:-$OUTDIR/install-openssl.log}"
-exec > >(tee "$LOG_OUTPUT")
+LOG_OUTPUT="${LOG_OUTPUT:-"install-openssl.log"}"
+exec > >(tee "$OUTDIR/$LOG_OUTPUT")
 exec 2>&1
 
 OPENSSL_VERSION="${OPENSSL_VERSION:?}"

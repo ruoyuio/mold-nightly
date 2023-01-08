@@ -5,8 +5,8 @@ set -e
 OUTDIR="${OUTDIR:-"$PWD/out"}"
 mkdir -p "$OUTDIR"
 
-LOG_OUTPUT="${LOG_OUTPUT:-$OUTDIR/install-cmake.log}"
-exec > >(tee "$LOG_OUTPUT")
+LOG_OUTPUT="${LOG_OUTPUT:-"install-cmake.log"}"
+exec > >(tee "$OUTDIR/$LOG_OUTPUT")
 exec 2>&1
 
 CMAKE_VERSION="${CMAKE_VERSION:?}"
