@@ -1,0 +1,49 @@
+name: build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "0 0 * * *"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: zhongruoyu/gcc-ports:12-xenial
+    env:
+      OPENSSL_VERSION: 3.0.7
+      CMAKE_VERSION: 3.25.1
+      MOLD_STABLE_VERSION: 1.9.0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Install OpenSSL
+        run: ./install-openssl.sh
+      - name: Install CMake
+        run: ./install-cmake.sh
+      - name: Build mold (nightly)
+        env:
+          GIT_REF: main
+          BUILD_SUFFIX: nightly
+          LOG_OUTPUT: build-mold-nightly.log
+        run: ./build-mold.sh
+      - name: Build mold (stable)
+        env:
+          GIT_REF: v${{ env.MOLD_STABLE_VERSION }}
+          BUILD_SUFFIX: ${{ env.MOLD_STABLE_VERSION }}
+          LOG_OUTPUT: build-mold-stable.log
+        run: ./build-mold.sh
+      - name: Commit and push build
+        run: |
+          cd out
+          git init
+          git config user.email ${{ secrets.GIT_USER_EMAIL }}
+          git config user.name ${{ secrets.GIT_USER_NAME }}
+          git remote add origin "https://${{ secrets.GH_USERNAME }}:${{ secrets.GH_TOKEN }}@github.com/${{ github.repository }}"
+          git checkout --orphan build
+          git add .
+          git commit --message="mold nightly build"
+          git push --force origin build
