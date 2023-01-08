@@ -1,8 +1,7 @@
 # mold nightly builds
 
-This repository holds nightly build of the
-[mold linker](https://github.com/rui314/mold) for x86_64 Linux. The latest
-stable release is also available.
+This repository holds nightly builds of the
+[mold linker](https://github.com/rui314/mold) for x86_64 Linux.
 
 ## Download
 
