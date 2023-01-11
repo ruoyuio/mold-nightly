@@ -11,7 +11,7 @@ exec 2>&1
 
 GIT_REF="${GIT_REF:-"main"}"
 SRCDIR="${SRCDIR:-"/usr/local/src"}"
-OPTDIR="${PREFIX:-"/opt"}"
+OPTDIR="${OPTDIR:-"/opt"}"
 BUILD_SUFFIX="${BUILD_SUFFIX:+"-$BUILD_SUFFIX"}"
 
 mkdir -p "$SRCDIR"
