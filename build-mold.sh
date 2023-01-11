@@ -3,7 +3,7 @@
 set -ex
 
 OUTDIR="${OUTDIR:-"$PWD/out"}"
-LOGDIR="${LOGDIR:-"$OUTDIR/log"}"
+LOGDIR="${LOGDIR:-"$OUTDIR/logs"}"
 mkdir -p "$OUTDIR" "$LOGDIR"
 
 LOG_OUTPUT="${LOG_OUTPUT:-"build-mold.log"}"
