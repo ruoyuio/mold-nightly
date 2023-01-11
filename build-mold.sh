@@ -17,8 +17,7 @@ BUILD_SUFFIX="${BUILD_SUFFIX:-""}"
 
 mkdir -p "$SRCDIR/mold"
 cd "$SRCDIR/mold"
-git clone https://github.com/rui314/mold.git .
-git checkout "$GIT_REF"
+git clone https://github.com/rui314/mold.git --branch "$MOLD_GIT_REF" --depth 1 .
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DMOLD_MOSTLY_STATIC=ON
 cmake --build build -j "$(nproc)"
 ctest --test-dir build -j "$(nproc)"
