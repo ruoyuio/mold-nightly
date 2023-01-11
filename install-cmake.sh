@@ -1,12 +1,13 @@
 #!/bin/bash
 
-set -e
+set -ex
 
 OUTDIR="${OUTDIR:-"$PWD/out"}"
-mkdir -p "$OUTDIR"
+LOGDIR="${LOGDIR:-"$OUTDIR/log"}"
+mkdir -p "$OUTDIR" "$LOGDIR"
 
 LOG_OUTPUT="${LOG_OUTPUT:-"install-cmake.log"}"
-exec > >(tee "$OUTDIR/$LOG_OUTPUT")
+exec > >(tee "$LOGDIR/$LOG_OUTPUT")
 exec 2>&1
 
 CMAKE_VERSION="${CMAKE_VERSION:?}"

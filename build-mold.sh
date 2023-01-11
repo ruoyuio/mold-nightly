@@ -1,22 +1,23 @@
 #!/bin/bash
 
-set -e
+set -ex
 
 OUTDIR="${OUTDIR:-"$PWD/out"}"
-mkdir -p "$OUTDIR"
+LOGDIR="${LOGDIR:-"$OUTDIR/log"}"
+mkdir -p "$OUTDIR" "$LOGDIR"
 
 LOG_OUTPUT="${LOG_OUTPUT:-"build-mold.log"}"
-exec > >(tee "$OUTDIR/$LOG_OUTPUT")
+exec > >(tee "$LOGDIR/$LOG_OUTPUT")
 exec 2>&1
 
-GIT_REF="${GIT_REF:-"main"}"
+MOLD_GIT_REF="${MOLD_GIT_REF:-"main"}"
 SRCDIR="${SRCDIR:-"/usr/local/src"}"
 OPTDIR="${OPTDIR:-"/opt"}"
-BUILD_SUFFIX="${BUILD_SUFFIX:+"-$BUILD_SUFFIX"}"
+BUILD_SUFFIX="${BUILD_SUFFIX:-""}"
 
-mkdir -p "$SRCDIR"
-git clone https://github.com/rui314/mold.git "$SRCDIR/mold"
+mkdir -p "$SRCDIR/mold"
 cd "$SRCDIR/mold"
+git clone https://github.com/rui314/mold.git .
 git checkout "$GIT_REF"
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DMOLD_MOSTLY_STATIC=ON
 cmake --build build -j "$(nproc)"
