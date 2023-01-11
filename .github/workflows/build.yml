@@ -46,7 +46,7 @@ jobs:
           git init
           git config user.email "${{ secrets.GIT_USER_EMAIL }}"
           git config user.name "${{ secrets.GIT_USER_NAME }}"
-          git remote add origin "https://${{ secrets.GH_USERNAME }}:${{ secrets.GH_TOKEN }}@github.com/${{ github.repository }}"
+          git remote add origin "https://${{ secrets.GH_USERNAME }}:${{ secrets.GH_TOKEN }}@${{ github.server_url }}/${{ github.repository }}"
           git checkout --orphan build
           git add .
           git commit --message="mold nightly builds"
