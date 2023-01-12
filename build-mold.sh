@@ -2,20 +2,18 @@
 
 set -ex
 
+MOLD_GIT_REF="${MOLD_GIT_REF:-"main"}"
+BUILD_SUFFIX="${BUILD_SUFFIX:-""}"
+
+SRCDIR="${SRCDIR:-"/usr/local/src"}"
+OPTDIR="${OPTDIR:-"/opt"}"
 OUTDIR="${OUTDIR:-"$PWD/out"}"
 LOGDIR="${LOGDIR:-"$OUTDIR/logs"}"
-mkdir -p "$OUTDIR" "$LOGDIR"
+mkdir -p "$SRCDIR" "$OPTDIR" "$OUTDIR" "$LOGDIR"
 
 LOG_OUTPUT="${LOG_OUTPUT:-"build-mold.log"}"
 exec > >(tee "$LOGDIR/$LOG_OUTPUT")
 exec 2>&1
-
-SRCDIR="${SRCDIR:-"/usr/local/src"}"
-OPTDIR="${OPTDIR:-"/opt"}"
-mkdir -p "$SRCDIR" "$OPTDIR"
-
-MOLD_GIT_REF="${MOLD_GIT_REF:-"main"}"
-BUILD_SUFFIX="${BUILD_SUFFIX:-""}"
 
 mkdir -p "$SRCDIR/mold"
 cd "$SRCDIR/mold"
