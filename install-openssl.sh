@@ -10,9 +10,11 @@ LOG_OUTPUT="${LOG_OUTPUT:-"install-openssl.log"}"
 exec > >(tee "$LOGDIR/$LOG_OUTPUT")
 exec 2>&1
 
-OPENSSL_VERSION="${OPENSSL_VERSION:?}"
 SRCDIR="${SRCDIR:-"/usr/local/src"}"
 PREFIX="${PREFIX:-"/usr/local"}"
+mkdir -p "$SRCDIR" "$PREFIX"
+
+OPENSSL_VERSION="${OPENSSL_VERSION:?}"
 
 mkdir -p "$SRCDIR/openssl"
 cd "$SRCDIR/openssl"

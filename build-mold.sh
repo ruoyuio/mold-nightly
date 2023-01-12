@@ -10,9 +10,11 @@ LOG_OUTPUT="${LOG_OUTPUT:-"build-mold.log"}"
 exec > >(tee "$LOGDIR/$LOG_OUTPUT")
 exec 2>&1
 
-MOLD_GIT_REF="${MOLD_GIT_REF:-"main"}"
 SRCDIR="${SRCDIR:-"/usr/local/src"}"
 OPTDIR="${OPTDIR:-"/opt"}"
+mkdir -p "$SRCDIR" "$OPTDIR"
+
+MOLD_GIT_REF="${MOLD_GIT_REF:-"main"}"
 BUILD_SUFFIX="${BUILD_SUFFIX:-""}"
 
 mkdir -p "$SRCDIR/mold"
