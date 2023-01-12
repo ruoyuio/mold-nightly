@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -ex
+set -euxo pipefail
 
 CMAKE_VERSION="${CMAKE_VERSION:?}"
 

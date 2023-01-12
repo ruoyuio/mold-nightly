@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -ex
+set -euxo pipefail
 
 OPENSSL_VERSION="${OPENSSL_VERSION:?}"
 

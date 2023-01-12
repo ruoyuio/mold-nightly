@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -ex
+set -euxo pipefail
 
 MOLD_GIT_REF="${MOLD_GIT_REF:-"main"}"
 BUILD_SUFFIX="${BUILD_SUFFIX:-""}"
