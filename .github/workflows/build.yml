@@ -12,40 +12,114 @@ concurrency:
   group: ${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  OPENSSL_VERSION: 3.0.7
+  CMAKE_VERSION: 3.25.1
+  MOLD_STABLE_VERSION: 1.9.0
+
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: zhongruoyu/gcc-ports:12-xenial
     env:
-      OPENSSL_VERSION: 3.0.7
-      CMAKE_VERSION: 3.25.1
-      MOLD_STABLE_VERSION: 1.9.0
+      SRCDIR: /usr/local/src
+      PREFIX: /usr/local
+      OPTDIR: /opt
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+      - name: Start Docker container
+        run: |
+          docker run \
+            --name="mold-builder" \
+            --detach \
+            --interactive \
+            --mount="type=bind,src=$PWD,dst=/root" \
+            --workdir="/root" \
+            zhongruoyu/gcc-ports:12-xenial
       - name: Install OpenSSL
-        run: ./install-openssl.sh
+        run: |
+          docker exec \
+            --env="OPENSSL_VERSION=$OPENSSL_VERSION" \
+            --env="SRCDIR=$SRCDIR" \
+            --env="PREFIX=$PREFIX" \
+            mold-builder \
+            ./install-openssl.sh
       - name: Install CMake
-        run: ./install-cmake.sh
+        run: |
+          docker exec \
+            --env="CMAKE_VERSION=$CMAKE_VERSION" \
+            --env="SRCDIR=$SRCDIR" \
+            --env="PREFIX=$PREFIX" \
+            mold-builder \
+            ./install-cmake.sh
       - name: Build mold (nightly)
+        id: build_mold_nightly
         env:
           MOLD_GIT_REF: main
           BUILD_SUFFIX: -nightly
-        run: ./build-mold.sh
+        run: |
+          docker exec \
+            --env="MOLD_GIT_REF=$MOLD_GIT_REF" \
+            --env="BUILD_SUFFIX=$BUILD_SUFFIX" \
+            --env="SRCDIR=$SRCDIR" \
+            --env="OPTDIR=$OPTDIR" \
+            mold-builder \
+            ./build-mold.sh
+          build_output="mold$BUILD_SUFFIX.tar.gz"
+          mold_version="$(docker exec mold-builder "$OPTDIR/mold$BUILD_SUFFIX/bin/mold" -v)"
+          echo "build_output=$build_output" | tee -a "$GITHUB_OUTPUT"
+          echo "mold_version=$mold_version" | tee -a "$GITHUB_OUTPUT"
       - name: Build mold (stable)
+        id: build_mold_stable
         env:
           MOLD_GIT_REF: v${{ env.MOLD_STABLE_VERSION }}
           BUILD_SUFFIX: -${{ env.MOLD_STABLE_VERSION }}
-        run: ./build-mold.sh
-      - name: Commit and push builds
         run: |
-          cd out
-          git init
-          git config user.email "${{ secrets.GIT_USER_EMAIL }}"
-          git config user.name "${{ secrets.GIT_USER_NAME }}"
-          git remote add origin "https://${{ secrets.GH_USERNAME }}:${{ secrets.GH_TOKEN }}@github.com/${{ github.repository }}"
-          git checkout --orphan build
-          git add .
-          git commit --message="mold nightly builds"
-          git push --force origin build
+          docker exec \
+            --env="MOLD_GIT_REF=$MOLD_GIT_REF" \
+            --env="BUILD_SUFFIX=$BUILD_SUFFIX" \
+            --env="SRCDIR=$SRCDIR" \
+            --env="OPTDIR=$OPTDIR" \
+            mold-builder \
+            ./build-mold.sh
+          build_output="mold$BUILD_SUFFIX.tar.gz"
+          mold_version="$(docker exec mold-builder "$OPTDIR/mold$BUILD_SUFFIX/bin/mold" -v)"
+          echo "build_output=$build_output" | tee -a "$GITHUB_OUTPUT"
+          echo "mold_version=$mold_version" | tee -a "$GITHUB_OUTPUT"
+      - name: Prepare release
+        run: |
+          date="$(date +%Y%m%d)"
+          TAG_NAME=""
+          for revision in {0..16}; do
+            if [[ -z "$(git ls-remote --tags origin "refs/tags/$date.$revision")" ]]; then
+              TAG_NAME="$date.$revision"
+              break
+            fi
+          done
+          if [[ -z "$TAG_NAME" ]]; then
+            exit 1
+          fi
+          RELEASE_TITLE="mold nightly builds $TAG_NAME"
+          NOTES_FILE="release-notes.txt"
+          cat <<EOF | tee -a "$NOTES_FILE"
+          - Nightly: \`${{ steps.build_mold_nightly.outputs.mold_version }}\`
+          - Stable ($MOLD_STABLE_VERSION): \`${{ steps.build_mold_stable.outputs.mold_version }}\`
+          EOF
+          echo "TAG_NAME=$TAG_NAME" | tee -a "$GITHUB_ENV"
+          echo "RELEASE_TITLE=$RELEASE_TITLE" | tee -a "$GITHUB_ENV"
+          echo "NOTES_FILE=$NOTES_FILE" | tee -a "$GITHUB_ENV"
+      - name: Create release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          git tag "$TAG_NAME"
+          git push origin "$TAG_NAME"
+          gh release create \
+            --latest \
+            --notes-file="$NOTES_FILE" \
+            --title="$RELEASE_TITLE" \
+            "$TAG_NAME" \
+            "${{ steps.build_mold_nightly.outputs.build_output }}" \
+            "${{ steps.build_mold_stable.outputs.build_output }}"

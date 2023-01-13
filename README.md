@@ -5,10 +5,8 @@ This repository holds nightly builds of the
 
 ## Download
 
-- Stable (1.9.0):
-[mold-1.9.0.tar.gz](https://github.com/ZhongRuoyu/mold-nightly/raw/build/mold-1.9.0.tar.gz)
-- Nightly (latest commit):
-[mold-nightly.tar.gz](https://github.com/ZhongRuoyu/mold-nightly/raw/build/mold-nightly.tar.gz)
+The builds can be found on the
+[releases](https://github.com/ZhongRuoyu/mold-nightly/releases) page.
 
 ## System requirements
 

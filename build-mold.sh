@@ -7,7 +7,7 @@ BUILD_SUFFIX="${BUILD_SUFFIX:-""}"
 
 SRCDIR="${SRCDIR:-"/usr/local/src"}"
 OPTDIR="${OPTDIR:-"/opt"}"
-OUTDIR="${OUTDIR:-"$PWD/out"}"
+OUTDIR="${OUTDIR:-"$PWD"}"
 mkdir -p "$SRCDIR" "$OPTDIR" "$OUTDIR"
 
 mkdir -p "$SRCDIR/mold"
@@ -18,4 +18,4 @@ cmake --build build -j "$(nproc)"
 ctest --test-dir build -j "$(nproc)" --output-on-failure
 cmake --install build --prefix "$OPTDIR/mold$BUILD_SUFFIX" --strip
 tar -C "$OPTDIR" -czf "$OUTDIR/mold$BUILD_SUFFIX.tar.gz" "mold$BUILD_SUFFIX"
-rm -rf "$SRCDIR/mold" "$OPTDIR/mold$BUILD_SUFFIX"
+rm -rf "$SRCDIR/mold"
