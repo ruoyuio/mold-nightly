@@ -10,9 +10,6 @@ This repository holds nightly builds of the
 - Nightly (latest commit):
 [mold-nightly.tar.gz](https://github.com/ZhongRuoyu/mold-nightly/raw/build/mold-nightly.tar.gz)
 
-Build logs are available on the
-[build](https://github.com/ZhongRuoyu/mold-nightly/tree/build) branch.
-
 ## System requirements
 
 The builds only require glibc 2.23 or newer.

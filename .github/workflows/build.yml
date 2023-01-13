@@ -32,13 +32,11 @@ jobs:
         env:
           MOLD_GIT_REF: main
           BUILD_SUFFIX: -nightly
-          LOG_OUTPUT: build-mold-nightly.log
         run: ./build-mold.sh
       - name: Build mold (stable)
         env:
           MOLD_GIT_REF: v${{ env.MOLD_STABLE_VERSION }}
           BUILD_SUFFIX: -${{ env.MOLD_STABLE_VERSION }}
-          LOG_OUTPUT: build-mold-stable.log
         run: ./build-mold.sh
       - name: Commit and push builds
         run: |
