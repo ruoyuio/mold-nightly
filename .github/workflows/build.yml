@@ -9,7 +9,7 @@ on:
     - cron: "0 0 * * *"
 
 concurrency:
-  group: ${{ github.ref }}
+  group: build
   cancel-in-progress: true
 
 env:
