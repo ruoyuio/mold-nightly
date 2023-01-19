@@ -13,9 +13,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  OPENSSL_VERSION: 3.0.7
-  CMAKE_VERSION: 3.25.1
-  MOLD_STABLE_VERSION: 1.9.0
+  OPENSSL_VERSION: "3.0.7"
+  CMAKE_VERSION: "3.25.1"
+  MOLD_STABLE_VERSION: "1.9.0"
 
 jobs:
   build:
