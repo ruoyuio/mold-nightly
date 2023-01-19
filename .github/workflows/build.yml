@@ -14,7 +14,7 @@ concurrency:
 
 env:
   OPENSSL_VERSION: "3.0.7"
-  CMAKE_VERSION: "3.25.1"
+  CMAKE_VERSION: "3.25.2"
   MOLD_STABLE_VERSION: "1.9.0"
 
 jobs:
