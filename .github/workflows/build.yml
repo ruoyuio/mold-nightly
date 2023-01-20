@@ -69,8 +69,10 @@ jobs:
             ./build-mold.sh
           build_output="mold$BUILD_SUFFIX.tar.gz"
           mold_version="$(docker exec mold-builder "$OPTDIR/mold$BUILD_SUFFIX/bin/mold" -v)"
+          checksum="$(sha256sum "mold$BUILD_SUFFIX.tar.gz")"
           echo "build_output=$build_output" | tee -a "$GITHUB_OUTPUT"
           echo "mold_version=$mold_version" | tee -a "$GITHUB_OUTPUT"
+          echo "checksum=$checksum" | tee -a "$GITHUB_OUTPUT"
       - name: Build mold (stable)
         id: build_mold_stable
         env:
@@ -86,8 +88,10 @@ jobs:
             ./build-mold.sh
           build_output="mold$BUILD_SUFFIX.tar.gz"
           mold_version="$(docker exec mold-builder "$OPTDIR/mold$BUILD_SUFFIX/bin/mold" -v)"
+          checksum="$(sha256sum "mold$BUILD_SUFFIX.tar.gz")"
           echo "build_output=$build_output" | tee -a "$GITHUB_OUTPUT"
           echo "mold_version=$mold_version" | tee -a "$GITHUB_OUTPUT"
+          echo "checksum=$checksum" | tee -a "$GITHUB_OUTPUT"
       - name: Tag release
         run: |
           date="$(date +%Y%m%d)"
@@ -110,8 +114,12 @@ jobs:
           RELEASE_TITLE="mold nightly builds $TAG_NAME"
           NOTES_FILE="release-notes.md"
           cat <<'EOF' | tee -a "$NOTES_FILE"
-          - Nightly (${{ steps.build_mold_nightly.outputs.build_output }}): `${{ steps.build_mold_nightly.outputs.mold_version }}`
-          - Stable (${{ steps.build_mold_stable.outputs.build_output }}): `${{ steps.build_mold_stable.outputs.mold_version }}`
+          ## Nightly (${{ steps.build_mold_nightly.outputs.build_output }})
+          mold version: `${{ steps.build_mold_nightly.outputs.mold_version }}`
+          SHA-256 checksum: `${{ steps.build_mold_nightly.outputs.checksum }}`
+          ## Stable (${{ steps.build_mold_stable.outputs.build_output }})
+          mold version: `${{ steps.build_mold_stable.outputs.mold_version }}`
+          SHA-256 checksum: `${{ steps.build_mold_stable.outputs.checksum }}`
           EOF
           echo "RELEASE_TITLE=$RELEASE_TITLE" | tee -a "$GITHUB_ENV"
           echo "NOTES_FILE=$NOTES_FILE" | tee -a "$GITHUB_ENV"
