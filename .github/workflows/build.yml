@@ -21,6 +21,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
+      DOCKER_IMAGE: zhongruoyu/gcc-ports:13-xenial
       SRCDIR: /usr/local/src
       PREFIX: /usr/local
       OPTDIR: /opt
@@ -37,7 +38,7 @@ jobs:
             --interactive \
             --mount="type=bind,src=$PWD,dst=/root" \
             --workdir="/root" \
-            zhongruoyu/gcc-ports:12-xenial
+            "$DOCKER_IMAGE"
       - name: Install OpenSSL
         run: |
           docker exec \
