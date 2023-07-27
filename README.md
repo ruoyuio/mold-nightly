@@ -16,5 +16,4 @@ The builds only require glibc 2.23 or newer.
 
 This repository, excluding the build artifacts, is [MIT-licensed](LICENSE).
 
-mold is licensed under
-[AGPL-3.0](https://github.com/rui314/mold/blob/main/LICENSE).
+mold is also [MIT-licensed](https://github.com/rui314/mold/blob/main/LICENSE).
