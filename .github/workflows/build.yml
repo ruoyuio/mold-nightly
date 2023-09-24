@@ -12,25 +12,18 @@ concurrency:
   group: build
   cancel-in-progress: true
 
-permissions:
-  contents: write
-
 jobs:
   prepare:
     name: Prepare build
     runs-on: ubuntu-latest
     outputs:
       mold_nightly_sha: ${{ steps.determine_versions.outputs.mold_nightly_sha }}
+      mold_nightly_url: ${{ steps.determine_versions.outputs.mold_nightly_url }}
       mold_nightly_version: ${{ steps.determine_versions.outputs.mold_nightly_version }}
       mold_stable_tag: ${{ steps.determine_versions.outputs.mold_stable_tag }}
+      mold_stable_url: ${{ steps.determine_versions.outputs.mold_stable_url }}
       mold_stable_version: ${{ steps.determine_versions.outputs.mold_stable_version }}
-      tag_name: ${{ steps.determine_tag_name.outputs.tag_name }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          token: ${{ github.token }}
-
       - name: Determine versions
         id: determine_versions
         env:
@@ -55,48 +48,6 @@ jobs:
             echo "mold_stable_version=$mold_stable_version"
           } | tee -a "$GITHUB_OUTPUT"
 
-      - name: Determine release tag name
-        id: determine_tag_name
-        run: |
-          date="$(date +%Y%m%d)"
-          tag_name=""
-
-          for revision in {0..15}; do
-            if [[ -z "$(git ls-remote --tags origin "refs/tags/$date.$revision")" ]]; then
-              tag_name="$date.$revision"
-              break
-            fi
-          done
-          if [[ -z "$tag_name" ]]; then
-            echo "Error: too many revisions on $date. Aborting." >&2
-            exit 1
-          fi
-          echo "tag_name=$tag_name" | tee -a "$GITHUB_OUTPUT"
-
-      - name: Generate release notes
-        id: release_notes
-        run: |
-          release_title='mold nightly builds ${{ steps.determine_tag_name.outputs.tag_name }}'
-          notes_file="release-notes.md"
-          cat <<'EOF' | tee -a "$notes_file"
-          Nightly: ${{ steps.determine_versions.outputs.mold_nightly_url }}
-          Stable: ${{ steps.determine_versions.outputs.mold_stable_url }}
-          EOF
-          {
-            echo "release_title=$release_title"
-            echo "notes_file=$notes_file"
-          } | tee -a "$GITHUB_OUTPUT"
-
-      - name: Create draft release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release create \
-            --draft \
-            --title='${{ steps.release_notes.outputs.release_title }}' \
-            --notes-file='${{ steps.release_notes.outputs.notes_file }}' \
-            '${{ steps.determine_tag_name.outputs.tag_name }}'
-
   build:
     needs: prepare
     strategy:
@@ -108,10 +59,10 @@ jobs:
           - ppc64le
           - s390x
         variant:
-          - nightly
           - stable
+          - nightly
       fail-fast: false
-    name: ${{ matrix.arch }} (${{ matrix.variant }})
+    name: Build (${{ matrix.arch }} ${{ matrix.variant }})
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -159,32 +110,88 @@ jobs:
             --env='SKIP_TESTS=${{ steps.setup_build.outputs.skip_tests }}' \
             rui314/mold-builder:latest \
             ./build-mold.sh
-
           build_output='mold${{ steps.setup_build.outputs.build_suffix }}.tar.gz'
-          checksum_output="$build_output.sha256"
-          sha256sum "$build_output" | tee "$checksum_output"
+          echo "build_output=$build_output" | tee -a "$GITHUB_OUTPUT"
 
-          {
-            echo "build_output=$build_output"
-            echo "checksum_output=$checksum_output"
-          } | tee -a "$GITHUB_OUTPUT"
-
-      - name: Upload release assets
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release upload '${{ needs.prepare.outputs.tag_name }}' \
-            '${{ steps.build_mold.outputs.build_output }}' \
-            '${{ steps.build_mold.outputs.checksum_output }}'
+      - name: Upload build output
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: mold
+          path: ${{ steps.build_mold.outputs.build_output }}
 
   publish:
     needs: [prepare, build]
-    name: Publish release
+    name: Publish build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - name: Publish release
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download build outputs
+        uses: actions/download-artifact@v3
+        with:
+          name: mold
+          path: mold/
+
+      - name: Compute checksums
+        id: compute_checksums
         run: |
-          gh release edit \
-            --draft=false \
+          cd mold
+          sha256sum mold*.tar.gz | tee SHA256SUMS
+          {
+            echo "sha256sums<<EOF"
+            cat SHA256SUMS
+            echo "EOF"
+          } | tee -a "$GITHUB_OUTPUT"
+
+      - name: Determine release tag name
+        id: determine_tag_name
+        run: |
+          date="$(date +%Y%m%d)"
+          tag_name=""
+
+          for revision in {0..15}; do
+            if [[ -z "$(git ls-remote --tags origin "refs/tags/$date.$revision")" ]]; then
+              tag_name="$date.$revision"
+              break
+            fi
+          done
+          if [[ -z "$tag_name" ]]; then
+            echo "Error: too many revisions on $date. Aborting." >&2
+            exit 1
+          fi
+
+          echo "tag_name=$tag_name" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          release_title='mold nightly builds ${{ steps.determine_tag_name.outputs.tag_name }}'
+          notes_file="release-notes.md"
+          cat <<'EOF' | tee -a "$notes_file"
+          Nightly: <${{ needs.prepare.outputs.mold_nightly_url }}>
+          Stable: <${{ needs.prepare.outputs.mold_stable_url }}>
+          SHA-256 checksums:
+          ```
+          ${{ steps.compute_checksums.outputs.sha256sums }}
+          ```
+          EOF
+          {
+            echo "release_title=$release_title"
+            echo "notes_file=$notes_file"
+          } | tee -a "$GITHUB_OUTPUT"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create \
             --latest \
-            '${{ needs.prepare.outputs.tag_name }}'
+            --title='${{ steps.release_notes.outputs.release_title }}' \
+            --notes-file='${{ steps.release_notes.outputs.notes_file }}' \
+            '${{ steps.determine_tag_name.outputs.tag_name }}' \
+            mold/mold*.tar.gz \
+            mold/SHA256SUMS
