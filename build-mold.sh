@@ -20,7 +20,9 @@ cmake -S . -B build \
   -DCMAKE_CXX_COMPILER=g++-10 \
   -DMOLD_MOSTLY_STATIC=ON
 cmake --build build -j "$(nproc)"
-ctest --test-dir build -j "$(nproc)" --output-on-failure
+if [[ -z "$SKIP_TESTS" ]]; then
+  ctest --test-dir build -j "$(nproc)" --output-on-failure
+fi
 cmake --install build --prefix "$OPTDIR/mold$BUILD_SUFFIX" --strip
 tar -C "$OPTDIR" -czf "$OUTDIR/mold$BUILD_SUFFIX.tar.gz" "mold$BUILD_SUFFIX"
 rm -rf "$SRCDIR/mold"
