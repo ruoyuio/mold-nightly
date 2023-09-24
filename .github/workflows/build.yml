@@ -12,101 +12,45 @@ concurrency:
   group: build
   cancel-in-progress: true
 
-env:
-  CMAKE_VERSION: "3.27.6"
-  MOLD_STABLE_VERSION: "2.2.0"
+permissions:
+  contents: write
 
 jobs:
-  build:
+  prepare:
+    name: Prepare build
     runs-on: ubuntu-latest
-    env:
-      DOCKER_IMAGE: zhongruoyu/gcc-ports:13-xenial
-      SRCDIR: /usr/local/src
-      PREFIX: /usr/local
-      OPTDIR: /opt
+    outputs:
+      mold_nightly_sha: ${{ steps.determine_versions.outputs.mold_nightly_sha }}
+      mold_stable_tag: ${{ steps.determine_versions.outputs.mold_stable_tag }}
+      tag_name: ${{ steps.determine_tag_name.outputs.tag_name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GH_TOKEN }}
+          token: ${{ github.token }}
 
-      - name: Start mold builder
-        run: |
-          docker run \
-            --name="mold-builder" \
-            --detach \
-            --interactive \
-            --mount="type=bind,src=$PWD,dst=/root" \
-            --workdir="/root" \
-            "$DOCKER_IMAGE"
-
-      - name: Install CMake
-        run: |
-          docker exec \
-            --env="CMAKE_VERSION=$CMAKE_VERSION" \
-            --env="SRCDIR=$SRCDIR" \
-            --env="PREFIX=$PREFIX" \
-            mold-builder \
-            ./install-cmake.sh
-
-      - name: Build mold (nightly)
-        id: build_mold_nightly
+      - name: Determine versions
+        id: determine_versions
         env:
-          MOLD_GIT_REF: main
-          BUILD_SUFFIX: -nightly
+          GH_TOKEN: ${{ github.token }}
         run: |
-          docker exec \
-            --env="MOLD_GIT_REF=$MOLD_GIT_REF" \
-            --env="BUILD_SUFFIX=$BUILD_SUFFIX" \
-            --env="SRCDIR=$SRCDIR" \
-            --env="OPTDIR=$OPTDIR" \
-            mold-builder \
-            ./build-mold.sh
+          nightly_info="$(gh api /repos/rui314/mold/commits/main)"
+          mold_nightly_sha="$(jq --raw-output .sha <<<"$nightly_info")"
+          mold_nightly_url="$(jq --raw-output .html_url <<<"$nightly_info")"
 
-          build_output="mold$BUILD_SUFFIX.tar.gz"
-          checksum_output="$build_output.sha256"
-          sha256sum "$build_output" | tee "$checksum_output"
-
-          mold_version="$(docker exec mold-builder "$OPTDIR/mold$BUILD_SUFFIX/bin/mold" -v)"
-          checksum="$(cat "$checksum_output")"
+          stable_info="$(gh api /repos/rui314/mold/releases/latest)"
+          mold_stable_tag="$(jq --raw-output .tag_name <<<"$stable_info")"
+          mold_stable_url="$(jq --raw-output .html_url <<<"$stable_info")"
 
           {
-            echo "build_output=$build_output"
-            echo "checksum_output=$build_output"
-            echo "mold_version=$mold_version"
-            echo "checksum=$checksum"
+            echo "mold_nightly_sha=$mold_nightly_sha"
+            echo "mold_nightly_url=$mold_nightly_url"
+            echo "mold_stable_tag=$mold_stable_tag"
+            echo "mold_stable_url=$mold_stable_url"
           } | tee -a "$GITHUB_OUTPUT"
 
-      - name: Build mold (stable)
-        id: build_mold_stable
-        env:
-          MOLD_GIT_REF: v${{ env.MOLD_STABLE_VERSION }}
-          BUILD_SUFFIX: -${{ env.MOLD_STABLE_VERSION }}
-        run: |
-          docker exec \
-            --env="MOLD_GIT_REF=$MOLD_GIT_REF" \
-            --env="BUILD_SUFFIX=$BUILD_SUFFIX" \
-            --env="SRCDIR=$SRCDIR" \
-            --env="OPTDIR=$OPTDIR" \
-            mold-builder \
-            ./build-mold.sh
-
-          build_output="mold$BUILD_SUFFIX.tar.gz"
-          checksum_output="$build_output.sha256"
-          sha256sum "$build_output" | tee "$checksum_output"
-
-          mold_version="$(docker exec mold-builder "$OPTDIR/mold$BUILD_SUFFIX/bin/mold" -v)"
-          checksum="$(cat "$checksum_output")"
-
-          {
-            echo "build_output=$build_output"
-            echo "checksum_output=$build_output"
-            echo "mold_version=$mold_version"
-            echo "checksum=$checksum"
-          } | tee -a "$GITHUB_OUTPUT"
-
-      - name: Tag release
-        id: tag_release
+      - name: Determine release tag name
+        id: determine_tag_name
         run: |
           date="$(date +%Y%m%d)"
           tag_name=""
@@ -121,40 +65,114 @@ jobs:
             echo "Error: too many revisions on $date. Aborting." >&2
             exit 1
           fi
-
-          git tag "$tag_name"
-          git push origin "$tag_name"
           echo "tag_name=$tag_name" | tee -a "$GITHUB_OUTPUT"
 
       - name: Generate release notes
         id: release_notes
         run: |
-          release_title="mold nightly builds ${{ steps.tag_release.outputs.tag_name }}"
+          release_title='mold nightly builds ${{ steps.determine_tag_name.outputs.tag_name }}'
           notes_file="release-notes.md"
           cat <<'EOF' | tee -a "$notes_file"
-          ## Nightly (${{ steps.build_mold_nightly.outputs.build_output }})
-          mold version: `${{ steps.build_mold_nightly.outputs.mold_version }}`
-          SHA-256 checksum: `${{ steps.build_mold_nightly.outputs.checksum }}`
-          ## Stable (${{ steps.build_mold_stable.outputs.build_output }})
-          mold version: `${{ steps.build_mold_stable.outputs.mold_version }}`
-          SHA-256 checksum: `${{ steps.build_mold_stable.outputs.checksum }}`
+          Nightly: ${{ steps.determine_versions.outputs.mold_nightly_url }}
+          Stable: ${{ steps.determine_versions.outputs.mold_stable_url }}
           EOF
           {
             echo "release_title=$release_title"
             echo "notes_file=$notes_file"
           } | tee -a "$GITHUB_OUTPUT"
 
-      - name: Create release
+      - name: Create draft release
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           gh release create \
-            --latest \
-            --notes-file='${{ steps.release_notes.outputs.notes_file }}' \
+            --draft \
             --title='${{ steps.release_notes.outputs.release_title }}' \
-            --verify-tag \
-            '${{ steps.tag_release.outputs.tag_name }}' \
-            '${{ steps.build_mold_nightly.outputs.build_output }}' \
-            '${{ steps.build_mold_nightly.outputs.checksum_output }}' \
-            '${{ steps.build_mold_stable.outputs.build_output }}' \
-            '${{ steps.build_mold_stable.outputs.checksum_output }}'
+            --notes-file='${{ steps.release_notes.outputs.notes_file }}' \
+            '${{ steps.determine_tag_name.outputs.tag_name }}'
+
+  build:
+    needs: prepare
+    strategy:
+      matrix:
+        arch:
+          - x86_64
+          - aarch64
+          - arm
+          - ppc64le
+          - s390x
+        variant:
+          - nightly
+          - stable
+      fail-fast: false
+    name: ${{ matrix.arch }} (${{ matrix.variant }})
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ github.token }}
+
+      - name: Set up nightly build
+        if: matrix.variant == 'nightly'
+        run: |
+          {
+            echo 'MOLD_GIT_REF=${{ needs.prepare.outputs.mold_nightly_sha }}'
+            echo 'BUILD_SUFFIX=-nightly-${{ matrix.arch }}-linux'
+          } | tee -a "$GITHUB_ENV"
+
+      - name: Set up stable build
+        if: matrix.variant == 'stable'
+        run: |
+          {
+            echo 'MOLD_GIT_REF=${{ needs.prepare.outputs.mold_stable_tag }}'
+            echo 'BUILD_SUFFIX=-${{ needs.prepare.outputs.mold_stable_tag }}-${{ matrix.arch }}-linux'
+          } | tee -a "$GITHUB_ENV"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Build mold
+        id: build_mold
+        run: |
+          docker run \
+            --rm \
+            --interactive \
+            --platform='linux/${{ matrix.arch }}' \
+            --mount="type=bind,src=$PWD,dst=/root" \
+            --workdir="/root" \
+            --env="MOLD_GIT_REF=$MOLD_GIT_REF" \
+            --env="BUILD_SUFFIX=$BUILD_SUFFIX" \
+            --env="SRCDIR=/usr/local/src" \
+            --env="OPTDIR=/opt" \
+            rui314/mold-builder:latest \
+            ./build-mold.sh
+
+          build_output="mold$BUILD_SUFFIX.tar.gz"
+          checksum_output="$build_output.sha256"
+          sha256sum "$build_output" | tee "$checksum_output"
+
+          {
+            echo "build_output=$build_output"
+            echo "checksum_output=$checksum_output"
+          } | tee -a "$GITHUB_OUTPUT"
+
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload '${{ needs.prepare.outputs.tag_name }}' \
+            '${{ steps.build_mold.outputs.build_output }}' \
+            '${{ steps.build_mold.outputs.checksum_output }}'
+
+  publish:
+    needs: [prepare, build]
+    name: Publish release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish release
+        run: |
+          gh release edit \
+            --draft=false \
+            --latest \
+            '${{ needs.prepare.outputs.tag_name }}'

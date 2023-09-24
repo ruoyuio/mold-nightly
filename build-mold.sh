@@ -12,8 +12,13 @@ mkdir -p "$SRCDIR" "$OPTDIR" "$OUTDIR"
 
 mkdir -p "$SRCDIR/mold"
 cd "$SRCDIR/mold"
-git clone https://github.com/rui314/mold.git --branch "$MOLD_GIT_REF" --depth 1 .
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DMOLD_MOSTLY_STATIC=ON
+wget -O - "https://github.com/rui314/mold/archive/$MOLD_GIT_REF.tar.gz" |
+  tar -xz --strip-components=1
+cmake -S . -B build \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_C_COMPILER=gcc-10 \
+  -DCMAKE_CXX_COMPILER=g++-10 \
+  -DMOLD_MOSTLY_STATIC=ON
 cmake --build build -j "$(nproc)"
 ctest --test-dir build -j "$(nproc)" --output-on-failure
 cmake --install build --prefix "$OPTDIR/mold$BUILD_SUFFIX" --strip
