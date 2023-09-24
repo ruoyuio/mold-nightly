@@ -21,7 +21,9 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       mold_nightly_sha: ${{ steps.determine_versions.outputs.mold_nightly_sha }}
+      mold_nightly_version: ${{ steps.determine_versions.outputs.mold_nightly_version }}
       mold_stable_tag: ${{ steps.determine_versions.outputs.mold_stable_tag }}
+      mold_stable_version: ${{ steps.determine_versions.outputs.mold_stable_version }}
       tag_name: ${{ steps.determine_tag_name.outputs.tag_name }}
     steps:
       - name: Checkout
@@ -37,16 +39,20 @@ jobs:
           nightly_info="$(gh api /repos/rui314/mold/commits/main)"
           mold_nightly_sha="$(jq --raw-output .sha <<<"$nightly_info")"
           mold_nightly_url="$(jq --raw-output .html_url <<<"$nightly_info")"
+          mold_nightly_version="nightly"
 
           stable_info="$(gh api /repos/rui314/mold/releases/latest)"
           mold_stable_tag="$(jq --raw-output .tag_name <<<"$stable_info")"
           mold_stable_url="$(jq --raw-output .html_url <<<"$stable_info")"
+          mold_stable_version="${mold_stable_tag#v}"
 
           {
             echo "mold_nightly_sha=$mold_nightly_sha"
             echo "mold_nightly_url=$mold_nightly_url"
+            echo "mold_nightly_version=$mold_nightly_version"
             echo "mold_stable_tag=$mold_stable_tag"
             echo "mold_stable_url=$mold_stable_url"
+            echo "mold_stable_version=$mold_stable_version"
           } | tee -a "$GITHUB_OUTPUT"
 
       - name: Determine release tag name
@@ -110,27 +116,30 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          token: ${{ github.token }}
-
-      - name: Set up nightly build
-        if: matrix.variant == 'nightly'
-        run: |
-          {
-            echo 'MOLD_GIT_REF=${{ needs.prepare.outputs.mold_nightly_sha }}'
-            echo 'BUILD_SUFFIX=-nightly-${{ matrix.arch }}-linux'
-          } | tee -a "$GITHUB_ENV"
-
-      - name: Set up stable build
-        if: matrix.variant == 'stable'
-        run: |
-          {
-            echo 'MOLD_GIT_REF=${{ needs.prepare.outputs.mold_stable_tag }}'
-            echo 'BUILD_SUFFIX=-${{ needs.prepare.outputs.mold_stable_tag }}-${{ matrix.arch }}-linux'
-          } | tee -a "$GITHUB_ENV"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
+
+      - name: Set up build
+        id: setup_build
+        run: |
+          platform='linux/${{ matrix.arch }}'
+          case '${{ matrix.variant }}' in
+          stable)
+            mold_git_ref='${{ needs.prepare.outputs.mold_stable_tag }}'
+            mold_version='${{ needs.prepare.outputs.mold_stable_version }}'
+            ;;
+          nightly)
+            mold_git_ref='${{ needs.prepare.outputs.mold_nightly_sha }}'
+            mold_version='${{ needs.prepare.outputs.mold_nightly_version }}'
+            ;;
+          esac
+          build_suffix="-$mold_version-${{ matrix.arch }}-linux"
+          {
+            echo "platform=$platform"
+            echo "mold_git_ref=$mold_git_ref"
+            echo "build_suffix=$build_suffix"
+          } | tee -a "$GITHUB_OUTPUT"
 
       - name: Build mold
         id: build_mold
@@ -138,17 +147,17 @@ jobs:
           docker run \
             --rm \
             --interactive \
-            --platform='linux/${{ matrix.arch }}' \
+            --platform='${{ steps.setup_build.outputs.platform }}' \
             --mount="type=bind,src=$PWD,dst=/root" \
             --workdir="/root" \
-            --env="MOLD_GIT_REF=$MOLD_GIT_REF" \
-            --env="BUILD_SUFFIX=$BUILD_SUFFIX" \
+            --env='MOLD_GIT_REF=${{ steps.setup_build.outputs.mold_git_ref }}' \
+            --env='BUILD_SUFFIX=${{ steps.setup_build.outputs.build_suffix }}' \
             --env="SRCDIR=/usr/local/src" \
             --env="OPTDIR=/opt" \
             rui314/mold-builder:latest \
             ./build-mold.sh
 
-          build_output="mold$BUILD_SUFFIX.tar.gz"
+          build_output='mold${{ steps.setup_build.outputs.build_suffix }}.tar.gz'
           checksum_output="$build_output.sha256"
           sha256sum "$build_output" | tee "$checksum_output"
 
