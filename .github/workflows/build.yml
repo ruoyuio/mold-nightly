@@ -26,10 +26,11 @@ jobs:
       OPTDIR: /opt
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           token: ${{ secrets.GH_TOKEN }}
-      - name: Start Docker container
+
+      - name: Start mold builder
         run: |
           docker run \
             --name="mold-builder" \
@@ -38,6 +39,7 @@ jobs:
             --mount="type=bind,src=$PWD,dst=/root" \
             --workdir="/root" \
             "$DOCKER_IMAGE"
+
       - name: Install CMake
         run: |
           docker exec \
@@ -46,6 +48,7 @@ jobs:
             --env="PREFIX=$PREFIX" \
             mold-builder \
             ./install-cmake.sh
+
       - name: Build mold (nightly)
         id: build_mold_nightly
         env:
@@ -59,12 +62,21 @@ jobs:
             --env="OPTDIR=$OPTDIR" \
             mold-builder \
             ./build-mold.sh
+
           build_output="mold$BUILD_SUFFIX.tar.gz"
+          checksum_output="$build_output.sha256"
+          sha256sum "$build_output" | tee "$checksum_output"
+
           mold_version="$(docker exec mold-builder "$OPTDIR/mold$BUILD_SUFFIX/bin/mold" -v)"
-          checksum="$(sha256sum "mold$BUILD_SUFFIX.tar.gz")"
-          echo "build_output=$build_output" | tee -a "$GITHUB_OUTPUT"
-          echo "mold_version=$mold_version" | tee -a "$GITHUB_OUTPUT"
-          echo "checksum=$checksum" | tee -a "$GITHUB_OUTPUT"
+          checksum="$(cat "$checksum_output")"
+
+          {
+            echo "build_output=$build_output"
+            echo "checksum_output=$build_output"
+            echo "mold_version=$mold_version"
+            echo "checksum=$checksum"
+          } | tee -a "$GITHUB_OUTPUT"
+
       - name: Build mold (stable)
         id: build_mold_stable
         env:
@@ -78,34 +90,48 @@ jobs:
             --env="OPTDIR=$OPTDIR" \
             mold-builder \
             ./build-mold.sh
+
           build_output="mold$BUILD_SUFFIX.tar.gz"
+          checksum_output="$build_output.sha256"
+          sha256sum "$build_output" | tee "$checksum_output"
+
           mold_version="$(docker exec mold-builder "$OPTDIR/mold$BUILD_SUFFIX/bin/mold" -v)"
-          checksum="$(sha256sum "mold$BUILD_SUFFIX.tar.gz")"
-          echo "build_output=$build_output" | tee -a "$GITHUB_OUTPUT"
-          echo "mold_version=$mold_version" | tee -a "$GITHUB_OUTPUT"
-          echo "checksum=$checksum" | tee -a "$GITHUB_OUTPUT"
+          checksum="$(cat "$checksum_output")"
+
+          {
+            echo "build_output=$build_output"
+            echo "checksum_output=$build_output"
+            echo "mold_version=$mold_version"
+            echo "checksum=$checksum"
+          } | tee -a "$GITHUB_OUTPUT"
+
       - name: Tag release
+        id: tag_release
         run: |
           date="$(date +%Y%m%d)"
-          TAG_NAME=""
-          for revision in {0..16}; do
+          tag_name=""
+
+          for revision in {0..15}; do
             if [[ -z "$(git ls-remote --tags origin "refs/tags/$date.$revision")" ]]; then
-              TAG_NAME="$date.$revision"
+              tag_name="$date.$revision"
               break
             fi
           done
-          if [[ -z "$TAG_NAME" ]]; then
+          if [[ -z "$tag_name" ]]; then
             echo "Error: too many revisions on $date. Aborting." >&2
             exit 1
           fi
-          git tag "$TAG_NAME"
-          git push origin "$TAG_NAME"
-          echo "TAG_NAME=$TAG_NAME" | tee -a "$GITHUB_ENV"
+
+          git tag "$tag_name"
+          git push origin "$tag_name"
+          echo "tag_name=$tag_name" | tee -a "$GITHUB_OUTPUT"
+
       - name: Generate release notes
+        id: release_notes
         run: |
-          RELEASE_TITLE="mold nightly builds $TAG_NAME"
-          NOTES_FILE="release-notes.md"
-          cat <<'EOF' | tee -a "$NOTES_FILE"
+          release_title="mold nightly builds ${{ steps.tag_release.outputs.tag_name }}"
+          notes_file="release-notes.md"
+          cat <<'EOF' | tee -a "$notes_file"
           ## Nightly (${{ steps.build_mold_nightly.outputs.build_output }})
           mold version: `${{ steps.build_mold_nightly.outputs.mold_version }}`
           SHA-256 checksum: `${{ steps.build_mold_nightly.outputs.checksum }}`
@@ -113,17 +139,22 @@ jobs:
           mold version: `${{ steps.build_mold_stable.outputs.mold_version }}`
           SHA-256 checksum: `${{ steps.build_mold_stable.outputs.checksum }}`
           EOF
-          echo "RELEASE_TITLE=$RELEASE_TITLE" | tee -a "$GITHUB_ENV"
-          echo "NOTES_FILE=$NOTES_FILE" | tee -a "$GITHUB_ENV"
+          {
+            echo "release_title=$release_title"
+            echo "notes_file=$notes_file"
+          } | tee -a "$GITHUB_OUTPUT"
+
       - name: Create release
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           gh release create \
             --latest \
-            --notes-file="$NOTES_FILE" \
-            --title="$RELEASE_TITLE" \
+            --notes-file='${{ steps.release_notes.outputs.notes_file }}' \
+            --title='${{ steps.release_notes.outputs.release_title }}' \
             --verify-tag \
-            "$TAG_NAME" \
-            "${{ steps.build_mold_nightly.outputs.build_output }}" \
-            "${{ steps.build_mold_stable.outputs.build_output }}"
+            '${{ steps.tag_release.outputs.tag_name }}' \
+            '${{ steps.build_mold_nightly.outputs.build_output }}' \
+            '${{ steps.build_mold_nightly.outputs.checksum_output }}' \
+            '${{ steps.build_mold_stable.outputs.build_output }}' \
+            '${{ steps.build_mold_stable.outputs.checksum_output }}'
