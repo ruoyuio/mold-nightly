@@ -1,7 +1,7 @@
 # mold nightly builds
 
 This repository holds nightly builds of the
-[mold linker](https://github.com/rui314/mold).
+[mold linker](https://github.com/rui314/mold) for GNU/Linux.
 
 The following architectures are available: x86_64, aarch64, arm, ppc64le, s390x.
 
