@@ -18,6 +18,7 @@ cmake -S . -B build \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_C_COMPILER=gcc-10 \
   -DCMAKE_CXX_COMPILER=g++-10 \
+  -DMOLD_LTO=ON \
   -DMOLD_MOSTLY_STATIC=ON
 cmake --build build -j "$(nproc)"
 if [[ -z "$SKIP_TESTS" ]]; then
