@@ -2,18 +2,8 @@
 
 set -euxo pipefail
 
-MOLD_GIT_REF="${MOLD_GIT_REF:-"main"}"
 BUILD_SUFFIX="${BUILD_SUFFIX:-""}"
 
-SRCDIR="${SRCDIR:-"/usr/local/src"}"
-OPTDIR="${OPTDIR:-"/opt"}"
-OUTDIR="${OUTDIR:-"$PWD"}"
-mkdir -p "$SRCDIR" "$OPTDIR" "$OUTDIR"
-
-mkdir -p "$SRCDIR/mold"
-cd "$SRCDIR/mold"
-wget -O - "https://github.com/rui314/mold/archive/$MOLD_GIT_REF.tar.gz" |
-  tar -xz --strip-components=1
 cmake -S . -B build \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_C_COMPILER=gcc-10 \
@@ -24,6 +14,6 @@ cmake --build build -j "$(nproc)"
 if [[ -z "$SKIP_TESTS" ]]; then
   ctest --test-dir build -j "$(nproc)" --output-on-failure
 fi
-cmake --install build --prefix "$OPTDIR/mold$BUILD_SUFFIX" --strip
-tar -C "$OPTDIR" -czf "$OUTDIR/mold$BUILD_SUFFIX.tar.gz" "mold$BUILD_SUFFIX"
-rm -rf "$SRCDIR/mold"
+cmake --install build --prefix "mold$BUILD_SUFFIX" --strip
+tar -czf "mold$BUILD_SUFFIX.tar.gz" "mold$BUILD_SUFFIX"
+rm -rf build "mold$BUILD_SUFFIX"

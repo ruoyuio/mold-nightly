@@ -97,16 +97,16 @@ jobs:
       - name: Build mold
         id: build_mold
         run: |
+          git clone https://github.com/rui314/mold.git mold
+          git -C mold checkout '${{ steps.setup_build.outputs.mold_git_ref }}'
+          cp build-mold.sh mold/
           docker run \
             --rm \
             --interactive \
             --platform='${{ steps.setup_build.outputs.platform }}' \
-            --mount="type=bind,src=$PWD,dst=/root" \
-            --workdir="/root" \
-            --env='MOLD_GIT_REF=${{ steps.setup_build.outputs.mold_git_ref }}' \
+            --mount="type=bind,src=$PWD/mold,dst=/usr/local/src/mold" \
+            --workdir="/usr/local/src/mold" \
             --env='BUILD_SUFFIX=${{ steps.setup_build.outputs.build_suffix }}' \
-            --env="SRCDIR=/usr/local/src" \
-            --env="OPTDIR=/opt" \
             --env='SKIP_TESTS=${{ steps.setup_build.outputs.skip_tests }}' \
             rui314/mold-builder:latest \
             ./build-mold.sh
@@ -118,7 +118,7 @@ jobs:
         if: always()
         with:
           name: mold
-          path: ${{ steps.build_mold.outputs.build_output }}
+          path: 'mold/${{ steps.build_mold.outputs.build_output }}'
 
   publish:
     needs: [prepare, build]
