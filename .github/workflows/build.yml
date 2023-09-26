@@ -17,35 +17,25 @@ jobs:
     name: Prepare build
     runs-on: ubuntu-latest
     outputs:
-      mold_nightly_sha: ${{ steps.determine_versions.outputs.mold_nightly_sha }}
-      mold_nightly_url: ${{ steps.determine_versions.outputs.mold_nightly_url }}
-      mold_nightly_version: ${{ steps.determine_versions.outputs.mold_nightly_version }}
       mold_stable_tag: ${{ steps.determine_versions.outputs.mold_stable_tag }}
-      mold_stable_url: ${{ steps.determine_versions.outputs.mold_stable_url }}
       mold_stable_version: ${{ steps.determine_versions.outputs.mold_stable_version }}
+      mold_nightly_sha: ${{ steps.determine_versions.outputs.mold_nightly_sha }}
+      mold_nightly_version: ${{ steps.determine_versions.outputs.mold_nightly_version }}
     steps:
       - name: Determine versions
         id: determine_versions
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          nightly_info="$(gh api /repos/rui314/mold/commits/main)"
-          mold_nightly_sha="$(jq --raw-output .sha <<<"$nightly_info")"
-          mold_nightly_url="$(jq --raw-output .html_url <<<"$nightly_info")"
-          mold_nightly_version="nightly"
-
-          stable_info="$(gh api /repos/rui314/mold/releases/latest)"
-          mold_stable_tag="$(jq --raw-output .tag_name <<<"$stable_info")"
-          mold_stable_url="$(jq --raw-output .html_url <<<"$stable_info")"
+          mold_stable_tag="$(gh api /repos/rui314/mold/releases/latest -q .tag_name)"
           mold_stable_version="${mold_stable_tag#v}"
-
+          mold_nightly_sha="$(gh api /repos/rui314/mold/commits/main -q .sha)"
+          mold_nightly_version="nightly"
           {
-            echo "mold_nightly_sha=$mold_nightly_sha"
-            echo "mold_nightly_url=$mold_nightly_url"
-            echo "mold_nightly_version=$mold_nightly_version"
             echo "mold_stable_tag=$mold_stable_tag"
-            echo "mold_stable_url=$mold_stable_url"
             echo "mold_stable_version=$mold_stable_version"
+            echo "mold_nightly_sha=$mold_nightly_sha"
+            echo "mold_nightly_version=$mold_nightly_version"
           } | tee -a "$GITHUB_OUTPUT"
 
   build:
@@ -136,6 +126,20 @@ jobs:
           name: mold
           path: mold/
 
+      - name: Get versions
+        id: get_versions
+        run: |
+          stable_build='mold-${{ needs.prepare.outputs.mold_stable_version }}-x86_64-linux'
+          tar -xzf "mold/$stable_build.tar.gz"
+          mold_stable_version_string="$("$stable_build/bin/mold" -v)"
+          nightly_build='mold-${{ needs.prepare.outputs.mold_nightly_version }}-x86_64-linux'
+          tar -xzf "mold/$nightly_build.tar.gz"
+          mold_nightly_version_string="$("$nightly_build/bin/mold" -v)"
+          {
+            echo "mold_stable_version_string=$mold_stable_version_string"
+            echo "mold_nightly_version_string=$mold_nightly_version_string"
+          } | tee -a "$GITHUB_OUTPUT"
+
       - name: Compute checksums
         id: compute_checksums
         run: |
@@ -172,12 +176,15 @@ jobs:
           release_title='mold nightly builds ${{ steps.determine_tag_name.outputs.tag_name }}'
           notes_file="release-notes.md"
           cat <<'EOF' | tee -a "$notes_file"
-          Nightly: <${{ needs.prepare.outputs.mold_nightly_url }}>
-          Stable: <${{ needs.prepare.outputs.mold_stable_url }}>
+          Stable: `${{ steps.get_versions.outputs.mold_stable_version_string }}`
+
+          Nightly: `${{ steps.get_versions.outputs.mold_nightly_version_string }}`
+
           SHA-256 checksums:
           ```
           ${{ steps.compute_checksums.outputs.sha256sums }}
           ```
+
           EOF
           {
             echo "release_title=$release_title"
