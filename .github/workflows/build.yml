@@ -76,12 +76,10 @@ jobs:
             ;;
           esac
           build_suffix="-$mold_version-${{ matrix.arch }}-linux"
-          skip_tests='${{ matrix.arch == 'arm' && '1' || '' }}'
           {
             echo "platform=$platform"
             echo "mold_git_ref=$mold_git_ref"
             echo "build_suffix=$build_suffix"
-            echo "skip_tests=$skip_tests"
           } | tee -a "$GITHUB_OUTPUT"
 
       - name: Build mold
@@ -97,7 +95,6 @@ jobs:
             --mount="type=bind,src=$PWD/mold,dst=/usr/local/src/mold" \
             --workdir="/usr/local/src/mold" \
             --env='BUILD_SUFFIX=${{ steps.setup_build.outputs.build_suffix }}' \
-            --env='SKIP_TESTS=${{ steps.setup_build.outputs.skip_tests }}' \
             rui314/mold-builder:latest \
             ./build-mold.sh
           build_output='mold${{ steps.setup_build.outputs.build_suffix }}.tar.gz'
