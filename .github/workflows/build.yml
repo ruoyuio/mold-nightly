@@ -2,6 +2,12 @@ name: build
 
 on:
   workflow_dispatch:
+    inputs:
+      build_image:
+        description: Build Docker images
+        required: false
+        type: boolean
+        default: false
   push:
     branches:
       - main
@@ -17,9 +23,11 @@ jobs:
     name: Prepare build
     runs-on: ubuntu-latest
     outputs:
-      mold_stable_tag: ${{ steps.determine_versions.outputs.mold_stable_tag }}
+      mold_stable_commit_sha: ${{ steps.determine_versions.outputs.mold_stable_commit_sha }}
+      mold_stable_commit_date: ${{ steps.determine_versions.outputs.mold_stable_commit_date }}
       mold_stable_version: ${{ steps.determine_versions.outputs.mold_stable_version }}
-      mold_nightly_sha: ${{ steps.determine_versions.outputs.mold_nightly_sha }}
+      mold_nightly_commit_sha: ${{ steps.determine_versions.outputs.mold_nightly_commit_sha }}
+      mold_nightly_commit_date: ${{ steps.determine_versions.outputs.mold_nightly_commit_date }}
       mold_nightly_version: ${{ steps.determine_versions.outputs.mold_nightly_version }}
     steps:
       - name: Determine versions
@@ -28,13 +36,22 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mold_stable_tag="$(gh api /repos/rui314/mold/releases/latest -q .tag_name)"
+          mold_stable_commit_info="$(gh api "/repos/rui314/mold/commits/tags/$mold_stable_tag")"
+          mold_stable_commit_sha="$(jq --raw-output .sha <<<"$mold_stable_commit_info")"
+          mold_stable_commit_date="$(jq --raw-output .commit.committer.date <<<"$mold_stable_commit_info")"
           mold_stable_version="${mold_stable_tag#v}"
-          mold_nightly_sha="$(gh api /repos/rui314/mold/commits/main -q .sha)"
+
+          mold_nightly_commit_info="$(gh api /repos/rui314/mold/commits/heads/main)"
+          mold_nightly_commit_sha="$(jq --raw-output .sha <<<"$mold_nightly_commit_info")"
+          mold_nightly_commit_date="$(jq --raw-output .commit.committer.date <<<"$mold_nightly_commit_info")"
           mold_nightly_version="nightly"
+
           {
-            echo "mold_stable_tag=$mold_stable_tag"
+            echo "mold_stable_commit_sha=$mold_stable_commit_sha"
+            echo "mold_stable_commit_date=$mold_stable_commit_date"
             echo "mold_stable_version=$mold_stable_version"
-            echo "mold_nightly_sha=$mold_nightly_sha"
+            echo "mold_nightly_commit_sha=$mold_nightly_commit_sha"
+            echo "mold_nightly_commit_date=$mold_nightly_commit_date"
             echo "mold_nightly_version=$mold_nightly_version"
           } | tee -a "$GITHUB_OUTPUT"
 
@@ -65,42 +82,66 @@ jobs:
       - name: Set up build
         id: setup_build
         run: |
-          platform='linux/${{ matrix.arch }}'
-          image='rui314/mold-builder-${{ matrix.arch }}:latest'
           case '${{ matrix.variant }}' in
           stable)
-            mold_git_ref='${{ needs.prepare.outputs.mold_stable_tag }}'
-            mold_version='${{ needs.prepare.outputs.mold_stable_version }}'
+            mold_commit_sha='${{ needs.prepare.outputs.mold_stable_commit_sha }}'
+            mold_commit_date='${{ needs.prepare.outputs.mold_stable_commit_date }}'
+            build_prefix='mold-${{ needs.prepare.outputs.mold_stable_version }}-${{ matrix.arch }}-linux'
             ;;
           nightly)
-            mold_git_ref='${{ needs.prepare.outputs.mold_nightly_sha }}'
-            mold_version='${{ needs.prepare.outputs.mold_nightly_version }}'
+            mold_commit_sha='${{ needs.prepare.outputs.mold_nightly_commit_sha }}'
+            mold_commit_date='${{ needs.prepare.outputs.mold_nightly_commit_date }}'
+            build_prefix='mold-${{ needs.prepare.outputs.mold_nightly_version }}-${{ matrix.arch }}-linux'
             ;;
           esac
-          build_suffix="-$mold_version-${{ matrix.arch }}-linux"
+
+          docker_platform='linux/${{ matrix.arch }}'
+          docker_image='mold-builder-${{ matrix.arch }}'
+          case '${{ matrix.arch }}' in
+          x86_64)
+            docker_file='x86_64.Dockerfile'
+            ;;
+          aarch64 | arm | ppc64le | s390x)
+            docker_file='bullseye.Dockerfile'
+            ;;
+          riscv64)
+            docker_file='riscv64.Dockerfile'
+            ;;
+          esac
+
           {
-            echo "platform=$platform"
-            echo "image=$image"
-            echo "mold_git_ref=$mold_git_ref"
-            echo "build_suffix=$build_suffix"
+            echo "mold_commit_sha=$mold_commit_sha"
+            echo "mold_commit_date=$mold_commit_date"
+            echo "build_prefix=$build_prefix"
+            echo "docker_platform=$docker_platform"
+            echo "docker_image=$docker_image"
+            echo "docker_file=$docker_file"
           } | tee -a "$GITHUB_OUTPUT"
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v3
+        with:
+          platforms: ${{ steps.setup_build.outputs.docker_platform }}
+          tags: ${{ steps.setup_build.outputs.docker_image }}
+          file: ${{ steps.setup_build.outputs.docker_file }}
 
       - name: Build mold
         id: build_mold
         run: |
           git clone https://github.com/rui314/mold.git mold
-          git -C mold checkout '${{ steps.setup_build.outputs.mold_git_ref }}'
+          git -C mold checkout '${{ steps.setup_build.outputs.mold_commit_sha }}'
           cp build-mold.sh mold/
           docker run \
             --rm \
             --interactive \
-            --platform='${{ steps.setup_build.outputs.platform }}' \
+            --platform='${{ steps.setup_build.outputs.docker_platform }}' \
             --mount="type=bind,src=$PWD/mold,dst=/usr/local/src/mold" \
             --workdir="/usr/local/src/mold" \
-            --env='BUILD_SUFFIX=${{ steps.setup_build.outputs.build_suffix }}' \
-            '${{ steps.setup_build.outputs.image }}' \
+            --env='BUILD_PREFIX=${{ steps.setup_build.outputs.build_prefix }}' \
+            --env='TIMESTAMP=${{ steps.setup_build.outputs.mold_commit_date }}' \
+            '${{ steps.setup_build.outputs.docker_image }}' \
             ./build-mold.sh
-          build_output='mold${{ steps.setup_build.outputs.build_suffix }}.tar.gz'
+          build_output='${{ steps.setup_build.outputs.build_prefix }}.tar.gz'
           echo "build_output=$build_output" | tee -a "$GITHUB_OUTPUT"
 
       - name: Upload build output
@@ -132,9 +173,11 @@ jobs:
           stable_build='mold-${{ needs.prepare.outputs.mold_stable_version }}-x86_64-linux'
           tar -xzf "mold/$stable_build.tar.gz"
           mold_stable_version_string="$("$stable_build/bin/mold" -v)"
+
           nightly_build='mold-${{ needs.prepare.outputs.mold_nightly_version }}-x86_64-linux'
           tar -xzf "mold/$nightly_build.tar.gz"
           mold_nightly_version_string="$("$nightly_build/bin/mold" -v)"
+
           {
             echo "mold_stable_version_string=$mold_stable_version_string"
             echo "mold_nightly_version_string=$mold_nightly_version_string"
