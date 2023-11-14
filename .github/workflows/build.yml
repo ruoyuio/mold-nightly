@@ -46,6 +46,7 @@ jobs:
           - x86_64
           - aarch64
           - arm
+          - riscv64
           - ppc64le
           - s390x
         variant:
@@ -65,6 +66,7 @@ jobs:
         id: setup_build
         run: |
           platform='linux/${{ matrix.arch }}'
+          image='rui314/mold-builder-${{ matrix.arch }}:latest'
           case '${{ matrix.variant }}' in
           stable)
             mold_git_ref='${{ needs.prepare.outputs.mold_stable_tag }}'
@@ -78,6 +80,7 @@ jobs:
           build_suffix="-$mold_version-${{ matrix.arch }}-linux"
           {
             echo "platform=$platform"
+            echo "image=$image"
             echo "mold_git_ref=$mold_git_ref"
             echo "build_suffix=$build_suffix"
           } | tee -a "$GITHUB_OUTPUT"
@@ -95,7 +98,7 @@ jobs:
             --mount="type=bind,src=$PWD/mold,dst=/usr/local/src/mold" \
             --workdir="/usr/local/src/mold" \
             --env='BUILD_SUFFIX=${{ steps.setup_build.outputs.build_suffix }}' \
-            rui314/mold-builder:latest \
+            '${{ steps.setup_build.outputs.image }}' \
             ./build-mold.sh
           build_output='mold${{ steps.setup_build.outputs.build_suffix }}.tar.gz'
           echo "build_output=$build_output" | tee -a "$GITHUB_OUTPUT"
