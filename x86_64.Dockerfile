@@ -1,12 +1,12 @@
 # Copyright (c) 2023 Rui Ueyama. Licensed under the MIT License.
 # https://github.com/rui314/mold/blob/main/LICENSE
 
-FROM debian:jessie-20210326
+FROM debian:jessie-20210326@sha256:32ad5050caffb2c7e969dac873bce2c370015c2256ff984b70c1c08b3a2816a0
 ENV DEBIAN_FRONTEND=noninteractive TZ=UTC
-RUN sed -i -e '/^deb/d' -e 's/^# //g' /etc/apt/sources.list && \
-  echo 'Acquire { Retries "10"; http::timeout "10"; Check-Valid-Until "false"; };' > /etc/apt/apt.conf.d/80-retries && \
+RUN sed -i -e '/^deb/d' -e 's/^# deb /deb [trusted=yes] /g' /etc/apt/sources.list && \
+  echo 'Acquire::Retries "10"; Acquire::http::timeout "10"; Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/80-retries && \
   apt-get update && \
-  apt-get install -y --force-yes --no-install-recommends wget bzip2 file make autoconf gcc g++ libssl-dev && \
+  apt-get install -y --no-install-recommends wget bzip2 file make autoconf gcc g++ libssl-dev && \
   rm -rf /var/lib/apt/lists
 
 # Build CMake 3.27

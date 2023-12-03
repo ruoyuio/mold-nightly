@@ -97,17 +97,7 @@ jobs:
 
           docker_platform='linux/${{ matrix.arch }}'
           docker_image='mold-builder-${{ matrix.arch }}'
-          case '${{ matrix.arch }}' in
-          x86_64)
-            docker_file='x86_64.Dockerfile'
-            ;;
-          aarch64 | arm | ppc64le | s390x)
-            docker_file='bullseye.Dockerfile'
-            ;;
-          riscv64)
-            docker_file='riscv64.Dockerfile'
-            ;;
-          esac
+          docker_file='${{ matrix.arch }}.Dockerfile'
 
           {
             echo "mold_commit_sha=$mold_commit_sha"
