@@ -79,6 +79,9 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Set up build
         id: setup_build
         run: |
@@ -114,6 +117,9 @@ jobs:
           platforms: ${{ steps.setup_build.outputs.docker_platform }}
           tags: ${{ steps.setup_build.outputs.docker_image }}
           file: ${{ steps.setup_build.outputs.docker_file }}
+          cache-from: type=gha
+          cache-to: type=gha
+          outputs: type=docker
 
       - name: Build mold
         id: build_mold
