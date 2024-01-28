@@ -112,7 +112,7 @@ jobs:
           } | tee -a "$GITHUB_OUTPUT"
 
       - name: Build Docker image
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v5
         with:
           platforms: ${{ steps.setup_build.outputs.docker_platform }}
           tags: ${{ steps.setup_build.outputs.docker_image }}
