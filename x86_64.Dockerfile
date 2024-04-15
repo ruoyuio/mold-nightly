@@ -10,8 +10,8 @@ RUN sed -i -e '/^deb/d' -e 's/^# deb /deb [trusted=yes] /g' /etc/apt/sources.lis
   rm -rf /var/lib/apt/lists
 
 # Build CMake 3.27
-RUN mkdir -p /build/cmake && \
-  cd /build/cmake && \
+RUN mkdir /build && \
+  cd /build && \
   wget -O- --no-check-certificate https://cmake.org/files/v3.27/cmake-3.27.7.tar.gz | tar xzf - --strip-components=1 && \
   ./bootstrap --parallel=$(nproc) && \
   make -j$(nproc) && \
@@ -19,8 +19,8 @@ RUN mkdir -p /build/cmake && \
   rm -rf /build
 
 # Build GCC 10
-RUN mkdir -p /build/gcc && \
-  cd /build/gcc && \
+RUN mkdir /build && \
+  cd /build && \
   wget -O- https://ftp.gnu.org/gnu/gcc/gcc-10.5.0/gcc-10.5.0.tar.gz | tar xzf - --strip-components=1 && \
   mkdir isl gmp mpc mpfr && \
   wget -O- https://gcc.gnu.org/pub/gcc/infrastructure/isl-0.18.tar.bz2 | tar xjf - --strip-components=1 -C isl && \
