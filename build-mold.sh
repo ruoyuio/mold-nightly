@@ -7,8 +7,13 @@ TIMESTAMP="${TIMESTAMP:-"$(date)"}"
 
 cmake -S . -B build \
   -DCMAKE_BUILD_TYPE=Release \
-  -DMOLD_LTO=ON \
-  -DMOLD_MOSTLY_STATIC=ON
+  -DMOLD_MOSTLY_STATIC=ON \
+  -DCMAKE_C_COMPILER=clang \
+  -DCMAKE_CXX_COMPILER=clang++
+cmake --build build -j "$(nproc)"
+cmake --install build
+
+cmake -S . -B build -DMOLD_USE_MOLD=ON
 cmake --build build -j "$(nproc)"
 cmake --install build --prefix "$BUILD_PREFIX" --strip
 
