@@ -60,12 +60,13 @@ jobs:
           - riscv64
           - ppc64le
           - s390x
+          - loongarch64
         variant:
           - stable
           - nightly
       fail-fast: false
     name: Build (${{ matrix.arch }} ${{ matrix.variant }})
-    runs-on: ubuntu-latest
+    runs-on: ${{ contains(fromJSON('["aarch64", "arm"]'), matrix.arch) && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
