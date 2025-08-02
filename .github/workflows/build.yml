@@ -129,9 +129,9 @@ jobs:
             --mount="type=bind,src=$PWD/mold,dst=/usr/local/src/mold" \
             --workdir="/usr/local/src/mold" \
             --env='BUILD_PREFIX=${{ steps.setup_build.outputs.build_prefix }}' \
-            --env='TIMESTAMP=${{ steps.setup_build.outputs.mold_commit_date }}' \
+            --env=TIMESTAMP="$(git -C mold log -1 --format=%ct)" \
             '${{ steps.setup_build.outputs.docker_image }}' \
-            ./build-mold.sh
+            ${{ matrix.arch == 'arm' && 'setarch linux32' || '' }} ./build-mold.sh
           build_output='${{ steps.setup_build.outputs.build_prefix }}.tar.gz'
           echo "build_output=$build_output" | tee -a "$GITHUB_OUTPUT"
 
